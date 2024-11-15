@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -5,6 +6,49 @@ from typing import Iterable
 import numpy as np
 
 from .creation import Feature
+
+
+def to_shapefile(features: Iterable[Feature], filename: Path):
+    """
+    Write a list of polygon features to ESRI shapefile format
+
+    Arguments:
+        features: List of features.
+        filename: Path to shapefile.
+    """
+    import fiona
+
+    # Convert to shapefile records, checking that there is enough homogeneity
+    # to be saved to a shapefile
+    geomtypes = set()
+    proptypes = {}
+    records = []
+    for feature in features:
+        geometry = feature.geometry.__geo_interface__
+        geomtypes.add(geometry["type"])
+
+        properties = feature.properties
+        for key, val in properties.items():
+            proptypes[key] = val.__class__.__name__
+
+        records.append({"geometry": geometry, "properties": properties})
+
+    # Determine the single geometry type, if possible
+    if geomtypes <= {"Polygon", "MultiPolygon"}:
+        # Note that the empty set (ie no features at all) is included here,
+        # which is fine
+        geomtype = "Polygon"
+    elif geomtypes <= {"LineString", "MultiLineString"}:
+        geomtype = "LineString"
+    elif geomtypes == {"Point"} or geomtypes == {"MultiPoint"}:
+        # Single types that cannot be mixed
+        geomtype = geomtypes.pop()
+    else:
+        raise ValueError(f"Cannot mix geometry types: {sorted(geomtypes)}")
+
+    schema = {"geometry": geomtype, "properties": proptypes}
+    with fiona.open(filename, "w", driver="ESRI Shapefile", schema=schema) as file:
+        file.writerecords(records)
 
 
 def to_iwxxm(

@@ -332,8 +332,8 @@ def find_objects(cube: Cube, thresholds: dict) -> Iterable[Feature]:
             # Assign additional information
             properties = {
                 "severity": label,
-                "base": np.ma.filled(np.min(bases[region]), 0),
-                "top": np.ma.filled(np.max(tops[region]), 600),
+                "base": int(np.ma.filled(np.min(bases[region]), 0)),
+                "top": int(np.ma.filled(np.max(tops[region]), 600)),
             }
 
             yield Feature(polygon, properties)
