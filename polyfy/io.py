@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+import shapely.geometry as sgeom
 
 from .creation import Feature
 
@@ -165,3 +166,46 @@ def to_iwxxm(
         out_dir,
         fragments=fragments,
     )
+
+
+def from_iwxxm(filename: Path) -> Iterable[Feature]:
+    """
+    Load features from IWXXM files
+
+    Arguments:
+        filename: Path to IWXXM files - either a complete xml file or a
+            directory containing xml fragments.
+
+    Returns:
+        List of features contained in the IWXXM files
+    """
+    from sigwx_objects.file_formats import iwxxm
+
+    # Split filename so that sigwx can reconstruct it
+    datadir, filename = os.path.split(filename)
+    datadir += "/"
+    filename, ext = os.path.splitext(filename)
+    parts = str(filename).split("_")
+    if (
+        len(parts) != 7
+        or parts[:2] != ["sigwx", "iwxxm"]
+        or not parts[-1].startswith("T+")
+    ):
+        raise ValueError(f"{filename} does not appear to match sigwx naming convention")
+    model_time = datetime.strptime(parts[4] + parts[5], "%Y%m%d%HZ")
+    lead = parts[-1][2:]  # Skip initial 'T+'
+    hour = str(model_time.hour)
+
+    # Read features
+    read = iwxxm.read_iwxxm if ext == ".xml" else iwxxm.read_iwxxm_fragments
+    features = read("EGRR", ["QVA"], datadir, model_time, hour, lead, 0).get("QVA", [])
+
+    # Convert to own feature class
+    for feature in features:
+        geometry = sgeom.Polygon([*zip(feature.lons, feature.lats)])
+        properties = {
+            "severity": feature.severity,
+            "base": feature.base,
+            "top": feature.top,
+        }
+        yield Feature(geometry, properties)
