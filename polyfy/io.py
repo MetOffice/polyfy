@@ -8,30 +8,23 @@ import numpy as np
 from .creation import Feature
 
 
-def to_shapefile(features: Iterable[Feature], filename: Path):
+def _find_schema(records: Iterable[dict]):
     """
-    Write a list of polygon features to ESRI shapefile format
+    Identify a schema for a homogeneous collection of features
 
-    Arguments:
-        features: List of features.
-        filename: Path to shapefile.
+    Argument:
+        records: List of features.
+
+    Returns:
+        Schema suitable for eg GeoJSON or Shapefile file formats
     """
-    import fiona
-
-    # Convert to shapefile records, checking that there is enough homogeneity
-    # to be saved to a shapefile
+    # Get types
     geomtypes = set()
     proptypes = {}
-    records = []
-    for feature in features:
-        geometry = feature.geometry.__geo_interface__
-        geomtypes.add(geometry["type"])
-
-        properties = feature.properties
-        for key, val in properties.items():
+    for record in records:
+        geomtypes.add(record["geometry"]["type"])
+        for key, val in record["properties"].items():
             proptypes[key] = val.__class__.__name__
-
-        records.append({"geometry": geometry, "properties": properties})
 
     # Determine the single geometry type, if possible
     if geomtypes <= {"Polygon", "MultiPolygon"}:
@@ -46,9 +39,45 @@ def to_shapefile(features: Iterable[Feature], filename: Path):
     else:
         raise ValueError(f"Cannot mix geometry types: {sorted(geomtypes)}")
 
-    schema = {"geometry": geomtype, "properties": proptypes}
-    with fiona.open(filename, "w", driver="ESRI Shapefile", schema=schema) as file:
+    return {"geometry": geomtype, "properties": proptypes}
+
+
+def _to_records(driver: str, features: Iterable[Feature], filename: Path):
+    import fiona
+
+    records = [
+        {"geometry": f.geometry.__geo_interface__, "properties": f.properties}
+        for f in features
+    ]
+    schema = _find_schema(records)
+
+    with fiona.open(str(filename), "w", driver=driver, schema=schema) as file:
         file.writerecords(records)
+
+
+def _from_records(filename: Path) -> Iterable[Feature]:
+    import fiona
+
+    with fiona.open(str(filename), "r") as file:
+        features = getattr(file, "__geo_interface__", file)
+        if isinstance(features, dict) and features.get("type") == "FeatureCollection":
+            features = features["features"]
+        for feature in features:
+            feature = getattr(feature, "__geo_interface__", feature)
+            if not feature["geometry"]:
+                continue
+            yield Feature(feature["geometry"], dict(feature["properties"]))
+
+
+def to_shapefile(features: Iterable[Feature], filename: Path):
+    """
+    Write a list of polygon features to ESRI shapefile format
+
+    Arguments:
+        features: List of features.
+        filename: Path to shapefile.
+    """
+    _to_records("ESRI Shapefile", features, filename)
 
 
 def from_shapefile(filename: Path) -> Iterable[Feature]:
@@ -61,17 +90,31 @@ def from_shapefile(filename: Path) -> Iterable[Feature]:
     Returns:
         List of features contained in the shapefile
     """
-    import fiona
+    return _from_records(filename)
 
-    with fiona.open(str(filename), "r") as file:
-        features = getattr(file, "__geo_interface__", file)
-        if isinstance(features, dict) and features.get("type") == "FeatureCollection":
-            features = features["features"]
-        for feature in features:
-            feature = getattr(feature, "__geo_interface__", feature)
-            if not feature["geometry"]:
-                continue
-            yield Feature(feature["geometry"], feature["properties"])
+
+def to_geojson(features: Iterable[Feature], filename: Path):
+    """
+    Write a list of polygon features to GeoJSON format
+
+    Arguments:
+        features: List of features.
+        filename: Path to JSON file.
+    """
+    _to_records("GeoJSON", features, filename)
+
+
+def from_geojson(filename: Path) -> Iterable[Feature]:
+    """
+    Load features from GeoJSON
+
+    Arguments:
+        filename: Path to JSON file.
+
+    Returns:
+        List of features contained in the file
+    """
+    return _from_records(filename)
 
 
 def to_iwxxm(
