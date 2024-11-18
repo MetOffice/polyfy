@@ -51,6 +51,29 @@ def to_shapefile(features: Iterable[Feature], filename: Path):
         file.writerecords(records)
 
 
+def from_shapefile(filename: Path) -> Iterable[Feature]:
+    """
+    Load features from a shapefile
+
+    Arguments:
+        filename: Path to shapefile.
+
+    Returns:
+        List of features contained in the shapefile
+    """
+    import fiona
+
+    with fiona.open(str(filename), "r") as file:
+        features = getattr(file, "__geo_interface__", file)
+        if isinstance(features, dict) and features.get("type") == "FeatureCollection":
+            features = features["features"]
+        for feature in features:
+            feature = getattr(feature, "__geo_interface__", feature)
+            if not feature["geometry"]:
+                continue
+            yield Feature(feature["geometry"], feature["properties"])
+
+
 def to_iwxxm(
     features: Iterable[Feature],
     out_dir: Path,
