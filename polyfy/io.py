@@ -7,6 +7,7 @@ import numpy as np
 import shapely.geometry as sgeom
 
 from .creation import Feature
+from .util import wrap_longitudes, unwrap_longitudes
 
 
 def _find_schema(records: Iterable[dict]):
@@ -147,7 +148,7 @@ def to_iwxxm(
     # Convert features to expected type
     def to_sigwx_object(geometry, properties):
         lons, lats = map(np.array, geometry.exterior.xy)
-        sigwx_object = QvaObject(lons, lats, 1)
+        sigwx_object = QvaObject(wrap_longitudes(lons, -180), lats, 1)
         sigwx_object.severity = properties["severity"].replace(" ", "")
         sigwx_object.base = properties.get("base", 0)
         sigwx_object.top = properties.get("top", 600)
@@ -202,7 +203,7 @@ def from_iwxxm(filename: Path) -> Iterable[Feature]:
 
     # Convert to own feature class
     for feature in features:
-        geometry = sgeom.Polygon([*zip(feature.lons, feature.lats)])
+        geometry = sgeom.Polygon([*zip(unwrap_longitudes(feature.lons), feature.lats)])
         properties = {
             "severity": feature.severity,
             "base": feature.base,
