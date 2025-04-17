@@ -7,7 +7,7 @@ import numpy as np
 import shapely.geometry as sgeom
 
 from .creation import Feature
-from .util import wrap_longitudes, unwrap_longitudes
+from .util import wrap_longitudes, unwrap_longitudes, wrap_polygon
 
 
 def _find_schema(records: Iterable[dict]):
@@ -47,10 +47,10 @@ def _find_schema(records: Iterable[dict]):
 def _to_records(driver: str, features: Iterable[Feature], filename: Path):
     import fiona
 
-    records = [
-        {"geometry": f.geometry.__geo_interface__, "properties": f.properties}
-        for f in features
-    ]
+    records = []
+    for f in features:
+        geometry = wrap_polygon(f.geometry).__geo_interface__
+        records.append({"geometry": geometry, "properties": f.properties})
     schema = _find_schema(records)
 
     with fiona.open(str(filename), "w", driver=driver, schema=schema) as file:

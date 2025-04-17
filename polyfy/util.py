@@ -1,5 +1,7 @@
 import iris.analysis
 import numpy as np
+import shapely.affinity
+import shapely.geometry as sgeom
 from iris.cube import Cube
 
 
@@ -38,6 +40,36 @@ def unwrap_longitudes(longitudes: np.ndarray) -> np.ndarray:
 
     # Sum the diffs to obtain contiguous longitudes
     return np.cumsum(diffs)
+
+
+def wrap_polygon(polygon: sgeom.Polygon, x0: float = -180) -> sgeom.MultiPolygon:
+    """
+    Wrap a polygon modulo 360 degrees, splitting it where necessary
+
+    Arguments:
+        polygon: Polygon to split and wrap.
+        x0: Start of the required range: longitudes will be wrapped into the
+            half-open interval [x0, x0 + 360). Default -180.
+
+    Returns:
+        Multipolygon whose components all lie in the given interval
+    """
+    # Quick check for any intersection at all
+    xmin, _, xmax, _ = polygon.bounds
+    if xmin >= x0 and xmax < x0 + 360:
+        return polygon
+
+    # Split into the part "in range" and the rest
+    part1 = sgeom.box(x0, -90, x0 + 360, 90).intersection(polygon)
+    part2 = polygon - part1
+
+    # Decide which way to shift the rest to keep it in range
+    if xmin < x0:
+        part2 = shapely.affinity.translate(part2, 360)
+    else:
+        part2 = shapely.affinity.translate(part2, -360)
+
+    return part1.union(part2)
 
 
 def flatten_cube(cube: Cube, method=iris.analysis.MAX) -> Cube:
