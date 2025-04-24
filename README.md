@@ -3,6 +3,21 @@
 Convert gridded data to polygons using a concave hull algorithm.
 
 
+## Example usage
+
+```python
+import iris
+import polyfy
+
+data = iris.load("data.nc")
+polygons = polyfy.find_objects(data)
+polyfy.io.to_shapefile(polygons, "polygons.shp")
+```
+
+Other serialisation methods are available, namely `polyfy.io.to_geojson`.
+[IWXXM] format via `to_iwxxm` is currently only available via a closed-source dependency.
+
+
 ## Algorithm overview
 
 This code aims to generate prisms - polygons with the added information of a base height and a top height - that represent 3-dimensional gridded environmental data.
@@ -70,6 +85,7 @@ Considering all horizontal grid cells contributing to the object, the lowest and
 The result is a collection of 3D prisms enclosing the gridded data.
 
 
+[IWXXM]: https://en.wikipedia.org/wiki/IWXXM
 [convex hull]: https://en.wikipedia.org/wiki/Convex_hull
 [convex hull algorithm]: https://en.wikipedia.org/wiki/Gift_wrapping_algorithm
 [`shapely.simplify`]: https://shapely.readthedocs.io/en/latest/reference/shapely.simplify.html
