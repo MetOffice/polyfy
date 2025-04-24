@@ -19,7 +19,7 @@ class Feature:
         self.properties = properties
 
 
-def concave_hull(data: np.ndarray, k: int = 11) -> sgeom.Polygon:
+def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
     """
     Find a concave hull of binary data
 
@@ -153,34 +153,44 @@ def concave_hull(data: np.ndarray, k: int = 11) -> sgeom.Polygon:
     return hull
 
 
-def tidy_data(data: np.ndarray, scale: int = 2) -> np.ndarray:
+def tidy_data(
+    data: np.ndarray,
+    sigma: float = 1.4,
+    box: int = 3,
+    threshold: float = 0.1,
+    scale: int = 2,
+    **kwargs,
+) -> np.ndarray:
     """
     Smooth binary (thresholded) data
 
     Carries out the following steps:
 
-    - Gaussian (sigma = 1.4)
-    - Box (size = 3)
-    - Threshold (10%)
-    - Downscale
+    - Gaussian (default sigma = 1.4)
+    - Box (default size = 3)
+    - Threshold (default 10%)
+    - Downscale (default 2x)
 
     Arguments:
         data: 2D boolean array.
+        sigma: Gaussian blur parameter.
+        box: Box filter parameter.
+        threshold: Binarisation threshold, in the range 0-1.
         scale: Downscale factor.
 
     Returns:
         A new 2D array with filters and scaling applied.
     """
-    # Low-pass filter to remove noise: Gaussian blur (sigma ≈ sqrt(2)) followed
-    # by a 3x3 box filter
+    # Low-pass filter to remove noise: Gaussian blur followed by box filter
     wrap_mode = ["constant", "wrap"]
-    data = ndimage.gaussian_filter(data * 100, 1.4, mode=wrap_mode)
-    data = ndimage.uniform_filter(data, 3, mode=wrap_mode)
+    data = data * 100
+    if sigma:
+        data = ndimage.gaussian_filter(data, sigma, mode=wrap_mode)
+    if box:
+        data = ndimage.uniform_filter(data, box, mode=wrap_mode)
 
-    # Re-apply a threshold of 10%.  Given the amplitude and radii of the
-    # applied filters, the filled area will now extend the original by up to 2
-    # grid cells.
-    data = data >= 10
+    # Apply a threshold to re-binarise the data
+    data = data >= threshold * 100
 
     # Downscale to speed up subsequent processing.  Note that this is only
     # appropriate following the removal of noise.
@@ -190,7 +200,7 @@ def tidy_data(data: np.ndarray, scale: int = 2) -> np.ndarray:
     return data
 
 
-def polygonise_region(data: np.ndarray) -> sgeom.Polygon:
+def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
     """
     Convert gridded data to a polygon
 
@@ -198,6 +208,8 @@ def polygonise_region(data: np.ndarray) -> sgeom.Polygon:
         data: 2D gridded data. It is assumed that appropriate filters and
             thresholds have already been applied. It is also assumed that the
             data represents a single connected region.
+        k: Initial number of nearest neighbours to consider when finding a
+            concave hull.
 
     Returns:
         Polygon covering the data.
@@ -224,10 +236,10 @@ def polygonise_region(data: np.ndarray) -> sgeom.Polygon:
     data, n_components = ndimage.label(data, np.ones((3, 3)))
 
     # Convert exterior to a polygon
-    polygon = concave_hull(data == 1)
+    polygon = concave_hull(data == 1, k=k)
     # and interiors to holes
     for i in range(2, n_components + 1):
-        polygon -= concave_hull(data == i)
+        polygon -= concave_hull(data == i, k=k)
 
     # Simplify shape, to reduce the number of vertices and reduce how
     # noticeably pixellated it is (which manifests as zig-zags).  Tolerances
@@ -266,7 +278,7 @@ def find_regions(data: np.ndarray) -> Iterable[np.ndarray]:
         yield component
 
 
-def find_objects(cube: Cube, thresholds: dict) -> Iterable[Feature]:
+def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
     """
     Find polygons describing where thresholds are exceeded
 
@@ -285,7 +297,7 @@ def find_objects(cube: Cube, thresholds: dict) -> Iterable[Feature]:
         raise RuntimeError("expected shape (y, x)")
 
     # Get transformation from grid indices to coordinate space
-    scale = 2
+    scale = kwargs.pop("scale", 2)
     dx = np.diff(xcoord.points).mean()
     dy = np.diff(ycoord.points).mean()
     x0 = xcoord.points[0]
@@ -316,13 +328,13 @@ def find_objects(cube: Cube, thresholds: dict) -> Iterable[Feature]:
         tops = tops[::scale, ::scale]
 
         # Remove noise from 2D max field
-        data = tidy_data(flat.data >= threshold)
+        data = tidy_data(flat.data >= threshold, **kwargs)
 
         # Loop through connected components
         for region in find_regions(data):
             # Attempt to convert to a polygon. Very small areas may yield
             # empty polygons, to be skipped.
-            polygon = polygonise_region(region)
+            polygon = polygonise_region(region, **kwargs)
             if polygon.is_empty:
                 continue
 
