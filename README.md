@@ -3,6 +3,29 @@
 Convert gridded data to polygons using a concave hull algorithm.
 
 
+## Installation
+
+Currently, this package can only be installed from source.
+
+First, setup an appropriate environment, such as a conda environment or a python venv, then install the package and its dependencies.
+
+### Conda
+
+```bash
+conda env create --file environment.yml
+conda activate polyfy
+pip install .
+```
+
+### Venv
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
+
 ## Example usage
 
 ```python

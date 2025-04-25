@@ -1,0 +1,9 @@
+name: polyfy
+dependencies:
+  - fiona
+  - iris
+  - numpy
+  - scipy
+  - shapely
+  - pytest
+  - ruff
