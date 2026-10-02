@@ -283,7 +283,8 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
     Find polygons describing where thresholds are exceeded
 
     Arguments:
-        cube: 3D field (Z, Y, X) of gridded data.
+        cube: Gridded data as either a 3D field (Z, Y, X) or a 2D field (Y, X)
+            with a scalar Z coordinate.
         thresholds: Mapping of threshold names to threshold values.
 
     Yields:
