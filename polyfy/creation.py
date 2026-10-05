@@ -211,7 +211,11 @@ def tidy_data(
 
 
 def polygonise_region(
-    data: np.ndarray, wrap: bool = False, k: int = 11, **kwargs
+    data: np.ndarray,
+    wrap: bool = False,
+    k: int = 11,
+    simplify: bool = True,
+    **kwargs,
 ) -> sgeom.Polygon:
     """
     Convert gridded data to a polygon
@@ -223,6 +227,7 @@ def polygonise_region(
         wrap: Whether the data wraps horizontally.
         k: Initial number of nearest neighbours to consider when finding a
             concave hull.
+        simplify: Whether to simplify the resulting polygon.
 
     Returns:
         Polygon covering the data.
@@ -258,7 +263,8 @@ def polygonise_region(
     # noticeably pixellated it is (which manifests as zig-zags).  Tolerances
     # less than 1 leave a significant amount of zig-zagging, while tolerances
     # greater than 1 carry too much risk of cutting off significant detail.
-    polygon = polygon.simplify(1)
+    if simplify:
+        polygon = polygon.simplify(1)
 
     return polygon
 
