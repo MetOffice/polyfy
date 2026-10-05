@@ -145,14 +145,8 @@ def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
             # Add the new point
             hull = hull.union(new_line)
             point = new_point
-            if np.isclose(new_angle, angle) and len(points) > 1:
-                # Angle is not changing (and not because we only just started),
-                # so replace the latest point instead of adding lots of
-                # collinear points
-                points[-1] = point
-            else:
-                points.append(point)
-                angle = new_angle
+            points.append(point)
+            angle = new_angle
             break
 
         else:
@@ -297,6 +291,9 @@ def polygonise_region(
     # greater than 1 carry too much risk of cutting off significant detail.
     if simplify:
         polygon = polygon.simplify(1)
+    else:
+        # At least simplify with a parameter of 0 to remove collinear points
+        polygon = polygon.simplify(0)
 
     return polygon
 
