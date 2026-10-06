@@ -99,6 +99,9 @@ Further adjustments are therefore made to help obtain a more natural shape.
 This is achieved by applying the Douglas-Peucker simplification algorithm (via [`shapely.simplify`]) with a tolerance of 1.
 This tolerance was chosen as a balance of being high enough that the gridded artefacts become less noticeable, yet still small enough that the shapes are not changed too much.
 
+Objects representing a higher threshold are then intersected with objects representing lower thresholds,
+as the simplification process provides no guarantees that this must hold.
+
 
 ### Find object characteristics
 

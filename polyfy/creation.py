@@ -18,6 +18,9 @@ class Feature:
         self.geometry = geometry
         self.properties = properties
 
+    def __getitem__(self, index):
+        return self.properties[index]
+
 
 def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
     """
@@ -305,7 +308,10 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
     tf = [dx * scale, 0, 0, dy * scale, x0, y0]
 
     flat = flatten_cube(cube)
-    for label, threshold in thresholds.items():
+
+    thresholds = sorted((threshold, label) for label, threshold in thresholds.items())
+    features = []
+    for threshold, label in thresholds:
         # Generate fields of base heights and top heights for this threshold
         data = cube.data >= threshold
         bases = np.ma.masked_invalid(
@@ -331,6 +337,8 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
         data = tidy_data(flat.data >= threshold, **kwargs)
 
         # Loop through connected components
+        prev_features = features
+        features = []
         for region in find_regions(data):
             # Attempt to convert to a polygon. Very small areas may yield
             # empty polygons, to be skipped.
@@ -342,10 +350,23 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
             polygon = shapely.affinity.affine_transform(polygon, tf)
 
             # Assign additional information
-            properties = {
-                "severity": label,
-                "base": int(np.ma.filled(np.min(bases[region]), 0)),
-                "top": int(np.ma.filled(np.max(tops[region]), 600)),
-            }
+            base = int(np.ma.filled(np.min(bases[region]), 0))
+            top = int(np.ma.filled(np.max(tops[region]), 600))
+            properties = {"severity": label, "base": base, "top": top}
 
-            yield Feature(polygon, properties)
+            # Check that this shape does not extend outside of any from the
+            # previous (lower) threshold
+            for feature in prev_features:
+                if feature["top"] < base or feature["base"] > top:
+                    continue
+                intersection = polygon.intersection(feature.geometry)
+                if not intersection.is_empty and not intersection.equals(polygon):
+                    polygon = intersection
+
+            for geom in getattr(polygon, "geoms", [polygon]):
+                features.append(Feature(geom, properties))
+
+        # No longer need to remember these
+        yield from prev_features
+
+    yield from features
