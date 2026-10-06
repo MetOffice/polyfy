@@ -236,7 +236,7 @@ def polygonise_region(
     data: np.ndarray,
     k: int = 11,
     smooth: int = 0,
-    simplify: bool = True,
+    simplify: float = 0,
     **kwargs,
 ) -> sgeom.Polygon:
     """
@@ -249,7 +249,8 @@ def polygonise_region(
         k: Initial number of nearest neighbours to consider when finding a
             concave hull.
         smooth: Number of neighbours to consider while smoothing, if any.
-        simplify: Whether to simplify the resulting polygon.
+        simplify: Amount of simplification to apply, if any.  Values greater
+            than 1 will likely remove too much significant detail.
 
     Returns:
         Polygon covering the data.
@@ -285,15 +286,10 @@ def polygonise_region(
     if smooth > 0:
         polygon = smooth_polygon(polygon, smooth)
 
-    # Simplify shape, to reduce the number of vertices and reduce how
-    # noticeably pixellated it is (which manifests as zig-zags).  Tolerances
-    # less than 1 leave a significant amount of zig-zagging, while tolerances
-    # greater than 1 carry too much risk of cutting off significant detail.
-    if simplify:
-        polygon = polygon.simplify(1)
-    else:
-        # At least simplify with a parameter of 0 to remove collinear points
-        polygon = polygon.simplify(0)
+    # Simplify shape, to at the very least (simplify = 0) remove collinear
+    # points, and optionally (simplify > 0) reduce how noticeably pixellated it
+    # is (which manifests as zig-zags).
+    polygon = polygon.simplify(simplify)
 
     return polygon
 

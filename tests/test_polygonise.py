@@ -38,10 +38,10 @@ def test_dateline_hole(hole):
     data[shell[1] : shell[3] + 1, : (shell[2] + 1) % width] = 1
     if hole[0] % width > hole[2] % width:
         # Hole is split across the edge: set in two steps
-        data[hole[1] : hole[3] + 1, hole[0] % width :] = 0
-        data[hole[1] : hole[3] + 1, : (hole[2] + 1) % width] = 0
+        data[hole[1] + 1 : hole[3], (hole[0] + 1) % width :] = 0
+        data[hole[1] + 1 : hole[3], : hole[2] % width] = 0
     else:
-        data[hole[1] : hole[3] + 1, hole[0] % width : (hole[2] + 1) % width] = 0
+        data[hole[1] + 1 : hole[3], (hole[0] + 1) % width : hole[2] % width] = 0
 
     polygon = polygonise_region(data)
     expected = sgeom.box(*shell) - sgeom.box(*hole)
