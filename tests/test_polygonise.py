@@ -1,5 +1,5 @@
 """
-Tests for polyfy.creation.polygonise_region
+Tests for ``polyfy.creation.polygonise_region``
 """
 
 import numpy as np

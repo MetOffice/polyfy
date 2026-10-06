@@ -18,6 +18,11 @@ class Feature:
         self.geometry = geometry
         self.properties = properties
 
+    def __eq__(self, other):
+        return (
+            self.geometry.equals(other.geometry) and self.properties == other.properties
+        )
+
 
 def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
     """
