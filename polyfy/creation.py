@@ -245,7 +245,7 @@ def tidy_data(
 def polygonise_region(
     data: np.ndarray,
     wrap: bool = False,
-    k: int = 11,
+    k: int = 5,
     smooth: int = 0,
     simplify: float = 0,
     **kwargs,
