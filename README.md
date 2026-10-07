@@ -88,7 +88,7 @@ This is specifically carried out by choosing one pixel as a starting point, then
 
 Smaller values of *k* follow the boundary more precisely, which may take longer due to identifying a longer perimeter, and will take longer due to taking smaller steps along it.
 Larger values of *k* require less processing time due to taking longer steps, but the allowed step length may be large enough to skip over entire strongly concave regions.
-On balance, a value of 11 has been chosen to be the default, though this is configurable.
+On balance, a value of `k = 5` has been chosen to be the default, though this is configurable.
 
 
 ### Refine objects
