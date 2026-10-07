@@ -49,7 +49,7 @@ Specifically, this is accomplished by the following steps:
 
 1. [Process gridded data](#process-gridded-data) - 3D (z, y, x) fields are preprocessed in order to facilitate identifying distinct objects, including collapsing to 2D (y, x) fields.
 1. [Find objects](#find-objects) - initial objects are found by a concave hull algorithm.
-1. [Refine objects](#refine-objects) - vertices are removed from the objects in order to simplify them and remove artefacts arising from the grid structure.
+1. [Refine objects](#refine-objects) - optionally, objects can be simplified or smoothed to tailor their appearance to the intended use case.
 1. [Find object characteristics](#find-object-characteristics) - top and base values are found for each object.
 
 Once created, the polygon objects can be saved to a file and plotted.
@@ -68,9 +68,9 @@ Each threshold is then applied in turn, and the resulting binary data is smoothe
 Default filters and their parameters were chosen such that data is spread out by up to two grid cells, and that noisy areas containing few isolated grid cells are filtered away.
 These are:
 
-- Gaussian (sigma = 1.4)
-- Box (size = 3x3)
-- Binarise (10% threshold)
+- Gaussian (default `sigma = 1.4`)
+- Box (default `box = 3`, i.e. a 3x3 box)
+- Binarise (default `threshold = 0.1`, i.e. a 10% threshold)
 
 These can, however, be configured.
 
@@ -88,16 +88,22 @@ This is specifically carried out by choosing one pixel as a starting point, then
 
 Smaller values of *k* follow the boundary more precisely, which may take longer due to identifying a longer perimeter, and will take longer due to taking smaller steps along it.
 Larger values of *k* require less processing time due to taking longer steps, but the allowed step length may be large enough to skip over entire strongly concave regions.
-On balance, a value of 11 has been chosen to be the default, though this is configurable.
+On balance, a value of `k = 5` has been chosen to be the default, though this is configurable.
 
 
 ### Refine objects
 
-The polygon resulting from the concave hull algorithm shows some obvious artefacts from the fact that all points were on a grid.
-Further adjustments are therefore made to help obtain a more natural shape.
+The polygon resulting from the concave hull algorithm generally shows some obvious artefacts from the fact that all points were on a grid.
+Further adjustments can therefore optionally be made to help obtain a more natural shape.
 
-This is achieved by applying the Douglas-Peucker simplification algorithm (via [`shapely.simplify`]) with a tolerance of 1.
-This tolerance was chosen as a balance of being high enough that the gridded artefacts become less noticeable, yet still small enough that the shapes are not changed too much.
+The options available are:
+- Simplification - apply the Douglas-Peucker simplification algorithm via [`shapely.simplify`].
+  The tolerance can be specified with the `simplify` parameter;
+  it is not recommended to use a tolerance higher than 1.
+- Smoothing (Laplacian) - average each vertex's position with its neighbours.
+  The number of neighbours to consider can be specified with the `smooth` parameter.
+
+Neither are applied by default.
 
 
 ### Find object characteristics

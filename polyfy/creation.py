@@ -4,7 +4,7 @@ import numpy as np
 import shapely.affinity
 import shapely.geometry as sgeom
 from iris.cube import Cube
-from scipy import ndimage
+from scipy import ndimage, signal
 from scipy.spatial import KDTree
 
 from .util import flatten_cube
@@ -17,6 +17,44 @@ class Feature:
 
         self.geometry = geometry
         self.properties = properties
+
+
+def smooth_polygon(geometry, n=1):
+    """
+    Apply Laplacian smoothing to a polygon
+
+    Arguments:
+        geometry: Polygon or multi-polygon to be smoothed.
+
+    Returns:
+        New smoothed polygon.
+    """
+
+    def _laplace(coords, n=1):
+        if len(coords) + 1 <= n:
+            # Degenerate case
+            return coords
+        if coords[0] == coords[-1]:
+            # Avoid double-counting start/end
+            coords = coords[:-1]
+
+        vertices = np.array(coords)
+        size = 2 * n + 1
+        window = np.ones((size, 1)) / size
+        return signal.convolve2d(vertices, window, "same", "wrap")
+
+    geoms = getattr(geometry, "geoms", [geometry])
+    smoothed = []
+    for geom in geoms:
+        geom = sgeom.Polygon(
+            _laplace(geom.exterior.coords, n=n),
+            [_laplace(hole.coords, n=n) for hole in geom.interiors],
+        )
+        smoothed.append(geom)
+
+    if len(smoothed) == 1:
+        return sgeom.Polygon(smoothed[0])
+    return sgeom.MultiPolygon(smoothed)
 
 
 def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
@@ -107,14 +145,8 @@ def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
             # Add the new point
             hull = hull.union(new_line)
             point = new_point
-            if np.isclose(new_angle, angle) and len(points) > 1:
-                # Angle is not changing (and not because we only just started),
-                # so replace the latest point instead of adding lots of
-                # collinear points
-                points[-1] = point
-            else:
-                points.append(point)
-                angle = new_angle
+            points.append(point)
+            angle = new_angle
             break
 
         else:
@@ -200,7 +232,13 @@ def tidy_data(
     return data
 
 
-def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
+def polygonise_region(
+    data: np.ndarray,
+    k: int = 5,
+    smooth: int = 0,
+    simplify: float = 0,
+    **kwargs,
+) -> sgeom.Polygon:
     """
     Convert gridded data to a polygon
 
@@ -210,6 +248,9 @@ def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
             data represents a single connected region.
         k: Initial number of nearest neighbours to consider when finding a
             concave hull.
+        smooth: Number of neighbours to consider while smoothing, if any.
+        simplify: Amount of simplification to apply, if any.  Values greater
+            than 1 will likely remove too much significant detail.
 
     Returns:
         Polygon covering the data.
@@ -241,11 +282,14 @@ def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
     for i in range(2, n_components + 1):
         polygon -= concave_hull(data == i, k=k)
 
-    # Simplify shape, to reduce the number of vertices and reduce how
-    # noticeably pixellated it is (which manifests as zig-zags).  Tolerances
-    # less than 1 leave a significant amount of zig-zagging, while tolerances
-    # greater than 1 carry too much risk of cutting off significant detail.
-    polygon = polygon.simplify(1)
+    # Apply smoothing
+    if smooth > 0:
+        polygon = smooth_polygon(polygon, smooth)
+
+    # Simplify shape, to at the very least (simplify = 0) remove collinear
+    # points, and optionally (simplify > 0) reduce how noticeably pixellated it
+    # is (which manifests as zig-zags).
+    polygon = polygon.simplify(simplify)
 
     return polygon
 
