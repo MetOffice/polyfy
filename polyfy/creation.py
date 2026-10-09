@@ -155,11 +155,11 @@ def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
 
 def tidy_data(
     data: np.ndarray,
+    wrap: bool = False,
     sigma: float = 1.4,
     box: int = 3,
     threshold: float = 0.1,
     scale: int = 2,
-    wrap: bool = False,
     **kwargs,
 ) -> np.ndarray:
     """
@@ -174,11 +174,11 @@ def tidy_data(
 
     Arguments:
         data: 2D boolean array.
+        wrap: Whether the data wraps horizontally.
         sigma: Gaussian blur parameter.
         box: Box filter parameter.
         threshold: Binarisation threshold, in the range 0-1.
         scale: Downscale factor.
-        wrap: Whether the data wraps horizontally.
 
     Returns:
         A new 2D array with filters and scaling applied.
@@ -292,6 +292,19 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
         cube: Gridded data as either a 3D field (Z, Y, X) or a 2D field (Y, X)
             with a scalar Z coordinate.
         thresholds: Mapping of threshold names to threshold values.
+        kwargs: Any additional keyword arguments to any of the intermediate
+            steps, that is:
+
+            * :func:`tidy_data`
+            * :func:`find_regions`
+            * :func:`polygonise_region`
+
+            See the corresponding function documentation for available
+            arguments and their descriptions.
+
+            In particular, while ``wrap`` - whether the horizontal coordinate
+            wraps the globe - should be automatically detected, it may be
+            explicitly specified as an argument.
 
     Yields:
         One feature per polygon identified at each of the requested thresholds.
