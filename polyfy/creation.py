@@ -155,6 +155,7 @@ def concave_hull(data: np.ndarray, k: int) -> sgeom.Polygon:
 
 def tidy_data(
     data: np.ndarray,
+    wrap: bool = False,
     sigma: float = 1.4,
     box: int = 3,
     threshold: float = 0.1,
@@ -173,6 +174,7 @@ def tidy_data(
 
     Arguments:
         data: 2D boolean array.
+        wrap: Whether the data wraps horizontally.
         sigma: Gaussian blur parameter.
         box: Box filter parameter.
         threshold: Binarisation threshold, in the range 0-1.
@@ -182,7 +184,7 @@ def tidy_data(
         A new 2D array with filters and scaling applied.
     """
     # Low-pass filter to remove noise: Gaussian blur followed by box filter
-    wrap_mode = ["constant", "wrap"]
+    wrap_mode = ["constant", "wrap"] if wrap else "constant"
     data = data * 100
     if sigma:
         data = ndimage.gaussian_filter(data, sigma, mode=wrap_mode)
@@ -200,7 +202,9 @@ def tidy_data(
     return data
 
 
-def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
+def polygonise_region(
+    data: np.ndarray, wrap: bool = False, k: int = 11, **kwargs
+) -> sgeom.Polygon:
     """
     Convert gridded data to a polygon
 
@@ -208,6 +212,7 @@ def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
         data: 2D gridded data. It is assumed that appropriate filters and
             thresholds have already been applied. It is also assumed that the
             data represents a single connected region.
+        wrap: Whether the data wraps horizontally.
         k: Initial number of nearest neighbours to consider when finding a
             concave hull.
 
@@ -218,12 +223,12 @@ def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
     # and making it easier to identify interior edges.  The filter on its own
     # highlights both the "filled side" of an edge and the "non-filled side" of
     # an edge, so intersect with the original area to get only the filled side.
-    wrap_mode = ["constant", "wrap"]
+    wrap_mode = ["constant", "wrap"] if wrap else "constant"
     data = ndimage.laplace(data, mode=wrap_mode) & data
 
     # Detect where wrapping has occurred
     first_empty = np.argmin(np.any(data, axis=0))
-    if first_empty > 0:
+    if wrap and first_empty > 0:
         # This data is (most likely) split, so wrap the left part to the right.
         # May genuinely only touch the left edge without crossing it, in which
         # case this operation is harmless.
@@ -250,12 +255,13 @@ def polygonise_region(data: np.ndarray, k: int = 11, **kwargs) -> sgeom.Polygon:
     return polygon
 
 
-def find_regions(data: np.ndarray) -> Iterable[np.ndarray]:
+def find_regions(data: np.ndarray, wrap: bool = False) -> Iterable[np.ndarray]:
     """
     Yield each connected component of binary data
 
     Arguments:
         data: 2D gridded data.
+        wrap: Whether the data wraps horizontally.
 
     Yields:
         New 2D arrays, each representing a single connected component.
@@ -263,11 +269,11 @@ def find_regions(data: np.ndarray) -> Iterable[np.ndarray]:
     # Detect connected components.  There is no option to wrap around edges, so
     # we concatenate two copies side-by-side then overlay them.
     width = data.shape[1]
-    data, n_components = ndimage.label(
-        np.concatenate([data, data], axis=1),
-        np.ones((3, 3)),
-    )
-    data = np.maximum(data[:, :width], data[:, width:])
+    if wrap:
+        data = np.concatenate([data, data], axis=1)
+    data, n_components = ndimage.label(data, np.ones((3, 3)))
+    if wrap:
+        data = np.maximum(data[:, :width], data[:, width:])
 
     for i in range(1, n_components + 1):
         component = data == i
@@ -283,8 +289,22 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
     Find polygons describing where thresholds are exceeded
 
     Arguments:
-        cube: 3D field (Z, Y, X) of gridded data.
+        cube: Gridded data as either a 3D field (Z, Y, X) or a 2D field (Y, X)
+            with a scalar Z coordinate.
         thresholds: Mapping of threshold names to threshold values.
+        kwargs: Any additional keyword arguments to any of the intermediate
+            steps, that is:
+
+            * :func:`tidy_data`
+            * :func:`find_regions`
+            * :func:`polygonise_region`
+
+            See the corresponding function documentation for available
+            arguments and their descriptions.
+
+            In particular, while ``wrap`` - whether the horizontal coordinate
+            wraps the globe - should be automatically detected, it may be
+            explicitly specified as an argument.
 
     Yields:
         One feature per polygon identified at each of the requested thresholds.
@@ -295,6 +315,7 @@ def find_objects(cube: Cube, thresholds: dict, **kwargs) -> Iterable[Feature]:
     zcoord = cube.coord(axis="z")
     if cube.coord_dims(xcoord)[0] < cube.coord_dims(ycoord)[0]:
         raise RuntimeError("expected shape (y, x)")
+    kwargs.setdefault("wrap", xcoord.circular)
 
     # Get transformation from grid indices to coordinate space
     scale = kwargs.pop("scale", 2)

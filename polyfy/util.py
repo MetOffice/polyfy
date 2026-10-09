@@ -88,4 +88,6 @@ def flatten_cube(cube: Cube, method=iris.analysis.MAX) -> Cube:
         for coord in cube.coords(dim_coords=True)
         if coord.name() not in ["latitude", "longitude"]
     ]
+    if not flat_coords:
+        return cube
     return cube.collapsed(flat_coords, method)
