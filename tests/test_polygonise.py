@@ -18,7 +18,7 @@ def test_dateline_simple():
     data[extent[1] : extent[3] + 1, extent[0] % width :] = 1
     data[extent[1] : extent[3] + 1, : (extent[2] + 1) % width] = 1
 
-    polygon = polygonise_region(data)
+    polygon = polygonise_region(data, wrap=True)
     expected = sgeom.box(*extent)
     assert polygon.equals(expected)
 
@@ -43,7 +43,7 @@ def test_dateline_hole(hole):
     else:
         data[hole[1] : hole[3] + 1, hole[0] % width : (hole[2] + 1) % width] = 0
 
-    polygon = polygonise_region(data)
+    polygon = polygonise_region(data, wrap=True)
     expected = sgeom.box(*shell) - sgeom.box(*hole)
     # Can't use strict equality (not in a general way anyway) because the
     # polygonisation algorithm can and will slightly cut concave corners, ie
