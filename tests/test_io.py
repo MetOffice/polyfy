@@ -3,6 +3,7 @@ Tests for ``polyfy.io``
 """
 
 import shapely.geometry as sgeom
+
 from polyfy import Feature, io
 
 
