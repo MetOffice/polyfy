@@ -1,5 +1,5 @@
 """
-Tests for `polyfy.util`
+Tests for ``polyfy.util``
 """
 
 import shapely.geometry as sgeom

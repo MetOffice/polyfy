@@ -66,9 +66,9 @@ def _from_records(filename: Path) -> Iterable[Feature]:
             features = features["features"]
         for feature in features:
             feature = getattr(feature, "__geo_interface__", feature)
-            if not feature["geometry"]:
-                continue
-            yield Feature(feature["geometry"], dict(feature["properties"]))
+            if feature["geometry"]:
+                geometry = sgeom.shape(feature["geometry"])
+                yield Feature(geometry, dict(feature["properties"]))
 
 
 def to_shapefile(features: Iterable[Feature], filename: Path):
